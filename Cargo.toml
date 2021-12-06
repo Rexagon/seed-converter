@@ -1,0 +1,22 @@
+[package]
+name = "seed-converter"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sc"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+argh = "0.1"
+hex = "0.4"
+ring = "0.16"
+thiserror = "1.0"
+
+ed25519-dalek = { git = "https://github.com/broxus/ed25519-dalek.git" }
+tiny-bip39 = { git = "https://github.com/broxus/tiny-bip39.git" }
+tiny-hderive = { git = "https://github.com/broxus/tiny-hderive.git" }
+
+[patch.crates-io]
+hmac-drbg = { git = "https://github.com/Rexagon/rust-hmac-drbg" }
