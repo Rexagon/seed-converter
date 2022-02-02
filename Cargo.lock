@@ -475,6 +475,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argh",
+ "base64",
  "ed25519-dalek",
  "hex",
  "ring",

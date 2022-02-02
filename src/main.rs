@@ -13,8 +13,8 @@ fn main() {
 
 fn run(app: App) -> Result<()> {
     match app.command {
-        Subcommand::Generate(generate) => {
-            let seed = seed_converter::generate_key(generate.ty)
+        Subcommand::Generate(args) => {
+            let seed = seed_converter::generate_key(args.ty)
                 .context("Failed to generate key")?
                 .words
                 .join(" ");
@@ -22,8 +22,8 @@ fn run(app: App) -> Result<()> {
             print!("{}", seed);
             Ok(())
         }
-        Subcommand::Derive(derive) => {
-            let seed = if let Some(seed) = derive.seed {
+        Subcommand::Derive(args) => {
+            let seed = if let Some(seed) = args.seed {
                 seed
             } else {
                 let mut seed = String::new();
@@ -33,20 +33,44 @@ fn run(app: App) -> Result<()> {
                 seed
             };
 
-            let path = if let Some(path) = &derive.path {
+            let path = if let Some(path) = &args.path {
                 path.as_str()
             } else {
                 "m/44'/396'/0'/0/0"
             };
 
-            let keys = seed_converter::derive_from_phrase(&seed, derive.ty, path)
+            let keys = seed_converter::derive_from_phrase(seed.trim(), args.ty, path)
                 .context("Failed to derive keys")?;
 
-            print!(
-                "{{\n  \"public\": \"{}\",\n  \"secret\": \"{}\"\n}}",
-                hex::encode(keys.public.as_bytes()),
-                hex::encode(keys.secret.as_bytes())
-            );
+            print!("{}", encode_key_pair(keys.secret, keys.public, args.base64));
+            Ok(())
+        }
+        Subcommand::Pubkey(args) => {
+            let secret = if let Some(secret) = args.secret {
+                secret
+            } else {
+                let mut secret = String::new();
+                std::io::stdin()
+                    .read_to_string(&mut secret)
+                    .context("Failed to read secret from stdin")?;
+                secret
+            };
+
+            let secret = match hex::decode(secret.trim()) {
+                Ok(bytes) if bytes.len() == 32 => {
+                    ed25519_dalek::SecretKey::from_bytes(&bytes).expect("Shouldn't fail")
+                }
+                _ => match base64::decode(secret.trim()) {
+                    Ok(bytes) if bytes.len() == 32 => {
+                        ed25519_dalek::SecretKey::from_bytes(&bytes).expect("Shouldn't fail")
+                    }
+                    _ => return Err(anyhow::anyhow!("Invalid secret key")),
+                },
+            };
+
+            let public = ed25519_dalek::PublicKey::from(&secret);
+
+            print!("{}", encode_key_pair(secret, public, args.base64));
             Ok(())
         }
     }
@@ -64,6 +88,7 @@ struct App {
 enum Subcommand {
     Generate(CmdGenerate),
     Derive(CmdDerive),
+    Pubkey(CmdPubkey),
 }
 
 #[derive(Debug, PartialEq, FromArgs)]
@@ -90,4 +115,41 @@ struct CmdDerive {
     /// derivation path for bip39 mnemonic
     #[argh(option, short = 'p')]
     path: Option<String>,
+
+    /// encode keys in base64 (hex by default)
+    #[argh(option, short = 'b')]
+    base64: bool,
+}
+
+#[derive(Debug, PartialEq, FromArgs)]
+/// Computes public key from secret key
+#[argh(subcommand, name = "pubkey")]
+struct CmdPubkey {
+    /// secret key in hex or empty for input from stdin
+    #[argh(positional)]
+    secret: Option<String>,
+
+    /// encode keys in base64 (hex by default)
+    #[argh(option, short = 'b')]
+    base64: bool,
+}
+
+fn encode_key_pair(
+    secret: ed25519_dalek::SecretKey,
+    public: ed25519_dalek::PublicKey,
+    base64: bool,
+) -> String {
+    let encode = |bytes: &[u8; 32]| -> String {
+        if base64 {
+            base64::encode(bytes)
+        } else {
+            hex::encode(bytes)
+        }
+    };
+
+    format!(
+        "{{\n  \"public\": \"{}\",\n  \"secret\": \"{}\"\n}}",
+        encode(public.as_bytes()),
+        encode(secret.as_bytes()),
+    )
 }
