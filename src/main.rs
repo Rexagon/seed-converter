@@ -117,7 +117,7 @@ struct CmdDerive {
     path: Option<String>,
 
     /// encode keys in base64 (hex by default)
-    #[argh(option, short = 'b')]
+    #[argh(switch)]
     base64: bool,
 }
 
@@ -130,7 +130,7 @@ struct CmdPubkey {
     secret: Option<String>,
 
     /// encode keys in base64 (hex by default)
-    #[argh(option, short = 'b')]
+    #[argh(switch)]
     base64: bool,
 }
 
